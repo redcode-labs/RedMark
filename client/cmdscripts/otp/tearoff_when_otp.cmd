@@ -1,0 +1,1 @@
+hf mfu otptear -b 3 -i 100 -s 200 -e 2500 -d FFFFFFFF -t EEEEEEEE -m 00000000   

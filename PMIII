@@ -1,0 +1,263 @@
+#!/bin/bash
+black=`tput setaf 0`
+black_bg=`tput setab 0`
+red=`tput setaf 1`
+green=`tput setaf 2`
+yellow=`tput setaf 3`
+blue=`tput setaf 4`
+magenta=`tput setaf 5`
+grey=`tput setaf 8`
+reset=`tput sgr0`
+bold=`tput bold`
+underline=`tput smul`
+blink=`tput blink`
+magenta_bg=`tput setab 5`
+blue_bg=`tput setab 4`
+red_bg=`tput setab 1`
+
+usb_first=0
+scan_loop=0
+scan_status=""
+connect_fails=0
+default_port="/dev/ttyACM0"
+port=$default_port
+#available_devices=$(./pm3 --list)
+bt_devices=0
+skip_init=0
+args="--flush -i"
+script="-s init"
+flash=0
+compile=0
+no_connect=0
+no_scan=0
+cmp=0
+generic=0
+params="STANDALONE=DANKARMULTI PLATFORM_EXTRAS=BTADDON"
+make_preamble=""
+drop_keyfiles=0
+drop_dir=""
+keys=""
+emu_keys=0
+cmd_args=""
+
+banner(){
+echo "$bold$blue                    _______     $reset" 
+echo "$bold$blue       [proxmark]   | | | | $reset" 
+echo "$bold$blue                    |_|_|_|  $red(v4.5)$reset" 
+
+}
+
+help_screen(){
+    echo
+    echo "usage: ./PMIII [options]"
+    echo
+    echo "-u"
+    echo "      Attempt to connect via USB-CDC first (default: BT add-on)"
+    echo "-l"
+    echo "      Scan for devices infinitely in a loop"
+    echo "-s"
+    echo "      Skip execution of 'init.cmd' script at startup"
+    echo "-p"
+    echo "      Explicitly use this port to connect"
+    echo "-c"
+    echo "      Compile firmware & client before connecting"
+    echo "-C"
+    echo "      Perform source checks before compilation" 
+    echo "-f"
+    echo "      Flash firmware before connecting"
+    echo "-o"
+    echo "      Do not connect to device for '-c' or '-f'; start in offline mode otherwise"
+    echo "-x"
+    echo "      Skip scan phase; connect to previously discovered BT address instead"
+    echo "-g"
+    echo "      Explicitly compile for generic PM3 device"
+    echo "-S"
+    echo "      Output smaller firmware by skipping some components (IClass, QT, Plot)"
+    echo "-v"
+    echo "      Verbose compilation output"
+    echo "-i"
+    echo "      Install needed utilities and disable modemmanager"
+    echo "-d <dir>"
+    echo "      Drop keyfiles into flashmem from this directory"
+    echo "-k <files>"
+    echo "      Load keys from .bin file into emulator memory"
+    echo
+}
+
+bt_connect(){
+    echo
+    echo "$green[${blink}${bold}+${reset}$green]$reset Found device in FPC mode -> [${blue}${bold}$bt_addr$reset]"
+    echo
+    echo "$green[<->]$reset Connecting via BT . . ."
+    echo
+    echo
+    if [ $flash -eq 1 ]; then
+        sleep 5
+    fi
+    _connect
+}
+
+usb_connect(){
+    if [ $flash -eq 1 ]; then
+        sleep 7
+    fi
+    port=$default_port
+    _connect
+}
+
+_connect(){
+    sudo ./pm3 $args $script -p $port 
+}
+
+scan(){
+    scan_cmd=$(hcitool scan|grep -i mark3)
+    scan_status="$?"
+    bt_devices=$(echo $scan_cmd|wc -l)
+    bt_addr=$(echo $scan_cmd | awk '{printf $1}')
+    echo "$bt_addr" > btaddr
+    port="bt:${bt_addr}"
+}
+
+while getopts 'ulsCcigSfovxhk:d:p:' opt; do
+  case "$opt" in
+    u)
+        usb_first=1
+        ;;
+    l)
+        scan_loop=1
+        ;;
+    s)
+        skip_init=1
+        ;;
+    S)
+        params="$params SKIPQT=1 SKIP_HFPLOT=1 SKIP_ICLASS=1 PLATFORM_SIZE=256"
+        ;;
+    v)
+        params="$params V=1"
+        ;;
+    i)
+        sudo ./install.sh
+        exit 0
+        ;;
+    f)
+        flash=1
+        ;;
+    g)
+        params="$params PLATFORM=PM3GENERIC"
+        generic=1
+        ;;
+    c)
+        compile=1
+        ;;
+    C)
+        make_preamble="make style && make check && make miscchecks &&"
+        ;;
+    o)
+        no_connect=1
+        ;;
+    p)
+        port=$OPTARG
+        ;;
+    d)
+        drop_dir=$OPTARG
+        drop_keyfiles=1
+        ;;
+    k)
+        keys=$OPTARG
+        emu_keys=1
+        ;;
+    x)
+        no_scan=1
+        ;;
+    h)
+        banner
+        echo
+        help_screen
+        echo
+        exit 0
+        ;;
+    :)
+        echo "${red}$bold[!!!]$reset Option requires an argument"
+        exit 1
+        ;;
+    ?)
+        echo "${red}$bold[!!!]$reset Invalid option"
+        exit 1
+        ;;
+    esac
+done
+
+shift "$(($OPTIND -1))"
+
+banner
+echo
+if [ $emu_keys -gt 0 ]; then
+    cmd_args="-c '$loader'"
+fi
+if [ $drop_keyfiles -eq 1 ]; then
+    : #TODO
+fi
+if [ $generic -eq 1 ]; then
+    params="$params PLATFORM=PM3RDV4"
+fi
+
+if [ $skip_init -eq 1 ]; then
+    script=""
+fi
+if [ $compile -eq 1 ]; then
+    echo "[:] Compiling . . ."
+    sudo make clean && $make_preamble sudo make $params -j
+    ((cmp++))
+fi
+if [ $flash -eq 1 ]; then
+    echo "[:] Flashing . . ."
+    sudo ./pm3-flash-all --force
+    ((cmp++))
+fi
+if [ $cmp -ne 0 ]; then
+    if [ $no_connect -eq 1 ]; then
+        exit 0
+    fi
+fi
+if [ $usb_first -eq 1 ]; then
+    echo "$green[<->]$reset Connecting via USB-CDC . . ."
+    usb_connect
+    exit 0
+fi
+if [ $no_connect -eq 1 ]; then
+    args="$args --offline --incognito"
+    _connect
+    exit 0
+fi
+args="$args -w"
+if [ $no_scan -eq 0 ]; then
+    echo "$blink$blue$bold[:]$reset Scanning . . ."
+    echo
+    scan
+    if [ $bt_devices -gt 1 ]; then
+        echo
+        echo "$yellow[:]$reset warning: $bt_devices devices found (${blue}BT$reset)"
+    fi
+else
+    if [ ! -f btaddr ]; then 
+        echo "$yellow$bold[:]$reset No previously paired device found, exiting . . . "
+        exit 0
+    fi
+    scan_status=0
+    bt_addr=$(cat btaddr)
+    port=bt:$bt_addr
+fi
+if [ $scan_status -eq 0 ]; then
+    bt_connect
+    exit 0
+else
+    if [ $scan_loop -eq 1 ]; then
+        while [ $scan_status -eq 1 ]; do
+            scan
+        done
+        bt_connect
+    else
+        echo "$yellow [!] $reset No BT device found, trying USB-CDC..."
+        usb_connect
+    fi
+fi

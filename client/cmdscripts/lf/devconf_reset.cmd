@@ -1,0 +1,1 @@
+lf 5x deviceconfig -p -z
