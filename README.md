@@ -6,8 +6,6 @@
   </a>
 </p>
 
-RedMark is a collection of our hardware, software (client) and firmware modifications to the Proxmark3 X RFID instrument.
-
 ### Motivation
 When we saw all those idle and unused soldering pads on our device, we thought that they needed some attention.
 Our 3 X model has all of the features of the RDv4, including SPIFFS, bluetooth communication, internal emulator and flash - we altered the source a little bit to enable maximum usage of this powerhouse.
