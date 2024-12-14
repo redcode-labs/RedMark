@@ -6,6 +6,13 @@
   </a>
 </p>
 
+### DISCLAIMER
+Given that this project is a fork of a fork, and that our team-owned Proxmxark is in constant rotation, keep in mind that replies to any kind of issues or pull requests might take a while. 
+What is more, please bear in mind that this fork is **NOT** actively maintained. 
+It was initially crafted as our "internal" fork, used for our team members to learn about RFID technology in general, which resulted in us making certain software and hardware modifications, as seen in this repo.
+Use at your own risk.
+If you want a quick run over our changes, please consider watching our talk, which was presented at The Hack Summit 2023 [HERE](https://drive.google.com/file/d/1bjoKQn0laOqPfcv79NfmEbMaf8QsRMKn/view?usp=sharing)
+
 ### Motivation
 When we saw all those idle and unused soldering pads on our device, we thought that they needed some attention.
 Our 3 X model has all of the features of the RDv4, including SPIFFS, bluetooth communication, internal emulator and flash - we altered the source a little bit to enable maximum usage of this powerhouse.
